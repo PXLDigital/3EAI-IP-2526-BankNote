@@ -34,17 +34,31 @@ def hsv_to_bgr(hsv_image):
     """
     return cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
 
+def apply_gaussian_blur(image, kernel_size=(3, 3), sigma=0.5):
+    """
+    Pas Gaussian blur toe om ruis te verminderen.
+    Parameters:
+        image (numpy.ndarray): Inputbeeld (in BGR).
+        kernel_size (tuple): Grootte van de kernel (moet oneven zijn, bijv. (5,5)).
+        sigma (float): Standaardafwijking van de Gaussische kern (0 = automatisch berekend).
+    Returns:
+        blurred_image (numpy.ndarray): Vervaagd beeld.
+    """
+    return cv2.GaussianBlur(image, kernel_size, sigma)
+
 def preprocess_image(image):
     """
     Complete pre-processing pipeline:
     1. RGB → HSV
     2. Histogram equalization (CLAHE) op Value
     3. HSV → BGR
+    4. Gaussian blur om ruis te verminderen (belangrijk voor edge detection)
     """
     hsv = rgb_to_hsv(image)
     hsv_eq = apply_clahe_on_value(hsv)
     bgr_eq = hsv_to_bgr(hsv_eq)
-    return bgr_eq
+    blurred = apply_gaussian_blur(bgr_eq)
+    return blurred
 
 def save_image(image, output_path, filename):
     """
