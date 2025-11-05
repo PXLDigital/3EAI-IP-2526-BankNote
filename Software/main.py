@@ -1,33 +1,74 @@
 import os
 import cv2
 from scripts.Preprocessing import preprocess_image, save_image
+from scripts.Edges import apply_canny_edge_detection, compute_edge_density
+import csv
 
-# Input en output directories
-input_dirs = ['images/real/', 'images/fake/']
-output_base_dir = 'output/preprocessed/'
+# --- Base project directory ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # dit is Software/
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # 3EAI-IP-2526-BankNote
 
-# Doorloop elke datasetmap (real / fake)
+# --- Input directories (relatief aan project root) ---
+input_dirs = [
+    os.path.join(PROJECT_ROOT, "Images", "real"),
+    os.path.join(PROJECT_ROOT, "Images", "fake")
+]
+
+# --- Output directories (relatief aan project root) ---
+preprocessed_base_dir = os.path.join(PROJECT_ROOT, "Output", "Preprocessed")
+edges_base_dir = os.path.join(PROJECT_ROOT, "Output", "Edges")
+edge_density_output_file = os.path.join(edges_base_dir, "edge_density.csv")
+
+# Zorg dat de hoofdmap voor edges bestaat
+os.makedirs(edges_base_dir, exist_ok=True)
+
+# Verzamel edge densities
+all_edge_densities = {}
+
+# --- Loop over elke datasetmap (real / fake) ---
 for input_dir in input_dirs:
     label = os.path.basename(os.path.normpath(input_dir))  # 'real' of 'fake'
-    output_dir = os.path.join(output_base_dir, label)
-    os.makedirs(output_dir, exist_ok=True)
+    
+    preprocessed_output_dir = os.path.join(preprocessed_base_dir, label)
+    edges_output_dir = os.path.join(edges_base_dir, label)
+    
+    os.makedirs(preprocessed_output_dir, exist_ok=True)
+    os.makedirs(edges_output_dir, exist_ok=True)
+    
+    print(f"\n=== Verwerken van map: {label.upper()} ===")
     
     for filename in os.listdir(input_dir):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            input_path = os.path.join(input_dir, filename)
-            image = cv2.imread(input_path)
-            
-            if image is None:
-                print(f"[FOUT] Kan beeld niet laden: {input_path}")
-                continue
-            
-            # Pre-process het beeld
-            processed_image = preprocess_image(image)
-            
-            # Sla het resultaat op
-            output_filename = filename.replace('.png', '_processed.png').replace('.jpg', '_processed.jpg')
-            save_image(processed_image, output_dir, output_filename)
-            
-            print(f"[OK] {input_path} → {os.path.join(output_dir, output_filename)}")
+        if not filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            continue
+        
+        input_path = os.path.join(input_dir, filename)
+        image = cv2.imread(input_path)
+        
+        if image is None:
+            print(f"[FOUT] Kan beeld niet laden: {input_path}")
+            continue
+        
+        # --- Stap 1: Preprocessing ---
+        preprocessed = preprocess_image(image)
+        preprocessed_filename = os.path.splitext(filename)[0] + "_preprocessed.png"
+        save_image(preprocessed, preprocessed_output_dir, preprocessed_filename)
+        
+        # --- Stap 2: Canny edge detection ---
+        edges = apply_canny_edge_detection(preprocessed)
+        edges_filename = os.path.splitext(filename)[0] + "_edges.png"
+        save_image(edges, edges_output_dir, edges_filename)
+        
+        # --- Stap 3: Edge density berekenen ---
+        density = compute_edge_density(edges)
+        all_edge_densities[f"{label}/{filename}"] = density
+        
+        print(f"[OK] {filename} → Preprocessed: {preprocessed_filename}, Edges: {edges_filename}, Edge density: {density:.4f}")
 
-print("Pre-processing voltooid.")
+# --- Stap 4: Sla edge densities op naar CSV ---
+with open(edge_density_output_file, mode='w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(["Filename", "EdgeDensity"])
+    for filename, density in all_edge_densities.items():
+        writer.writerow([filename, density])
+
+print(f"\nPipeline voltooid! Edge densities opgeslagen in {edge_density_output_file}")
