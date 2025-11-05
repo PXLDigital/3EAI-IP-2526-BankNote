@@ -127,6 +127,60 @@ Voor het *Banknote Verifier*-project is **Canny Edge Detection** gekozen als hoo
 
 ---
 
+### 3.4. Resultaten – Edge Density Analyse
+
+### Doel
+De **edge density** (randschadichtheid) meet hoeveel randen (intensiteitsveranderingen) aanwezig zijn in een beeld, relatief ten opzichte van het totaal aantal pixels. Dit geeft een kwantitatieve indicatie van de **complexiteit en fijnheid van microstructuren** in het biljet.
+
+\[
+\text{Edge Density} = \frac{\text{Aantal randpixels}}{\text{Totaal aantal pixels}}
+\]
+
+In Python (na Canny- of Sobel-detectie):
+```python
+edges = cv2.Canny(gray, lower, upper)
+edge_density = np.sum(edges > 0) / edges.size
+```
+
+Echte biljetten bevatten veel fijne druklijnen en texturen, waardoor ze een **meer gebalanceerde en consistente randstructuur** hebben. Valse biljetten daarentegen vertonen vaak **onnatuurlijke contrasten** of **ruisachtige randen** door inferieure printkwaliteit.
+
+---
+
+### Tabel met gemeten waarden
+| Type | Bestandsnaam | EdgeDensity | Interpretatie |
+|------|---------------|--------------|----------------|
+| real | 10euroReal.png | 0.0052 | Zeer lage randdichtheid – homogeen oppervlak. |
+| real | 200euroReal.png | 0.0265 | Gematigde randdichtheid – duidelijke structuren zichtbaar. |
+| real | 20euroReal.png | 0.0206 | Typisch echt biljet – goed detailcontrast. |
+| real | 50euroReal.png | 0.0118 | Lage randdichtheid – mogelijk zachte belichting. |
+| real | 5euroReal.png | 0.0288 | Hoogste echte waarde – sterke textuurdetails. |
+| fake | 100euroFake.png | 0.0138 | Laag, mogelijk goed nagemaakte vervalsing. |
+| fake | 10euroFake.png | 0.0358 | Hoog – onnatuurlijke patronen of ruis. |
+| fake | 200euroFake.png | 0.0574 | Zeer hoog – printartefacten aanwezig. |
+| fake | 20euroFake.png | 0.0824 | Extreem hoog – overmatige ruis, slechte kwaliteit. |
+| fake | 50euroFake.png | 0.0412 | Hoog – inconsistente randen. |
+| fake | 5euroFake.png | 0.0554 | Hoog – diffuse randen typisch voor vervalsing. |
+
+---
+
+### Statistische vergelijking
+| Categorie | Gemiddelde Edge Density |
+|------------|-------------------------|
+| Echte biljetten | **0.0186** |
+| Valse biljetten | **0.0476** |
+
+**Valse biljetten hebben gemiddeld ~2,5× hogere edge density** dan echte biljetten. Dit duidt op een groter aantal scherpe overgangen en visuele ruis.
+
+---
+
+### Interpretatie
+- **Echte biljetten:** lage, consistente edge density → verfijnde microdruk en uniforme oppervlakken.
+- **Valse biljetten:** hoge edge density → overmatige randen, printartefacten of contrastruis.
+
+Deze resultaten bevestigen dat **edge density** een nuttige metriek is voor het onderscheiden van echte en valse biljetten.
+
+---
+
 ## 4. Frequentiedomeinanalyse (FFT)
 Een **2D Fast Fourier Transform (FFT)** wordt toegepast op de grijswaardenversie van het biljet.  
 Door de energieverdeling in het frequentiedomein te analyseren kunnen drukpatronen herkend worden:
