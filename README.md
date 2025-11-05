@@ -1,117 +1,193 @@
 # Banknote Verifier – Echt vs Vals Geld Herkenning
+**Laatste update:** 2025-11-05
 
 ## Groepsleden
-- Emiel Mangelschots
-- Bjarni Heselmans
+- Emiel Mangelschots  
+- Bjarni Heselmans  
 
 ---
 
 ## Projectdoel
-Dit project heeft als doel een systeem te ontwikkelen dat met een webcam of camera via microcontroller kan bepalen of een bankbiljet echt of vals is.
-In tegenstelling tot machine learning of deep learning benaderingen, maken wij uitsluitend gebruik van klassieke image processing-technieken zoals:
+Dit project heeft als doel een systeem te ontwikkelen dat met een **webcam** of **camera via microcontroller** kan bepalen of een bankbiljet **echt of vals** is.  
+In tegenstelling tot machine learning- of deep learning-benaderingen maken wij **uitsluitend gebruik van klassieke image processing-technieken**, waaronder:
 
-- Kleurconversies (RGB → HSV)
-- Histogram equalization en gamma-correctie
-- Low-pass filtering (ruisonderdrukking)
-- Edge detection (Canny / Sobel)
-- Frequentiedomeinanalyse (FFT)
-- Textuuranalyse via Gabor- en Laplacian-filters
+- Kleurconversies (RGB → HSV)  
+- Histogram equalization (CLAHE) en gamma-correctie  
+- Low-pass filtering (ruisonderdrukking)  
+- **Edge detection (Sobel / Canny)**  
+- Frequentiedomeinanalyse (FFT)  
+- Textuuranalyse via Gabor- en Laplacian-filters  
 
-Echte biljetten vertonen specifieke microstructuren, patronen en fijne textuurdetails die vervalsingen missen. Door deze kenmerken te analyseren en te kwantificeren kunnen we het biljet classificeren als "waarschijnlijk echt" of "waarschijnlijk vals".
+Echte biljetten vertonen specifieke **microstructuren en patronen** die vervalsingen missen.  
+Door deze kenmerken te analyseren en te kwantificeren kunnen we het biljet classificeren als “**waarschijnlijk echt**” of “**waarschijnlijk vals**”.
 
 ---
 
 ## Overzicht van de methode
 
 ### 1. Beeldverwerving
-- Input via webcam of camera op microcontroller (bijv. Raspberry Pi).
-- Bankbiljetten worden op een egale achtergrond gelegd onder constante belichting.
+- Input via webcam of microcontroller (bijv. Raspberry Pi).  
+- Biljetten worden op een egale achtergrond geplaatst onder constante belichting.  
 - Beelden worden vastgelegd in RGB-formaat (8-bit per kanaal).
 
+---
+
 ### 2. Voorbewerking
-Doel: stabiliseren van de belichting, verbeteren van contrast, en ruisonderdrukking.
+Doel: stabiliseren van belichting, verbeteren van contrast en ruisonderdrukking.
 
 | Stap | Methode | Reden / Verwachte effect |
 |------|----------|--------------------------|
-| Kleurconversie | RGB → HSV | Scheidt helderheid (Value) van kleurtint (Hue) zodat analyse robuuster is voor belichting. |
-| Histogram equalization / Gamma-correctie | CLAHE (Contrast Limited Adaptive Histogram Equalization) | Verbetert contrast, maakt randen beter zichtbaar, en compenseert ongelijke belichting. |
-| Low-pass filtering | Gaussian blur (σ = 1–2) | Vermindert hoge-frequentieruis, voorkomt foutieve randdetectie. |
+| Kleurconversie | RGB → HSV | Scheidt helderheid (Value) van kleurtint (Hue), robuuster tegen belichting. |
+| Contrastverbetering | CLAHE (Contrast Limited Adaptive Histogram Equalization) | Verhoogt lokaal contrast, maakt randen beter zichtbaar. |
+| Ruisonderdrukking | Gaussian blur (σ = 0.5–2) | Vermindert hoge-frequentieruis en stabiliseert randdetectie. |
+
+De voorbewerkte beelden worden opgeslagen in `Output/real/` en `Output/fake/`.
 
 ---
 
-### 3. Edge & textuuranalyse
-Na de voorbewerking worden rand- en textuurkenmerken geëxtraheerd.
+## 3. Edge Detection – Analyse van micropatronen
 
-| Stap | Methode | Doel |
-|------|----------|------|
-| Edge detection | Canny of Sobel | Opsporen van randen en microprintpatronen op het biljet. |
-| Edge density berekening | Gemiddeld aantal edge-pixels per oppervlakte | Echte biljetten hebben hogere en complexere randdichtheid. |
-| Laplacian of High-pass filtering | Versterken van hoge frequenties | Maakt fijne structuren en textuurverschillen duidelijker. |
-| Gabor-filters | Oriëntatie- en frequentiegevoelige textuuranalyse | Herkent druklijnen en textuurpatronen die op echte biljetten voorkomen. |
+Een cruciaal onderdeel van de *Banknote Verifier* is het detecteren van **randen en microstructuren** die kenmerkend zijn voor echte biljetten.  
+Hiervoor werden twee klassieke methoden onderzocht: **Sobel Edge Detection** en **Canny Edge Detection**.
 
 ---
 
-### 4. Frequentiedomeinanalyse (FFT)
-Een 2D Fast Fourier Transform (FFT) wordt toegepast op de grijswaardenversie van het biljet.
-Door de energieverdeling in de frequentiedomeinrepresentatie te meten, kunnen we zien of het biljet regelmatige hoge-frequentiecomponenten bevat (kenmerkend voor offsetdruk).
+### 3.1 Sobel Edge Detection
 
-- Echte biljetten: duidelijke ringstructuren / pieken in hoge frequenties.
-- Valse biljetten (geprint): energie geconcentreerd in lage frequenties (vlakke patronen).
+#### Doel
+De **Sobel-operator** wordt toegepast op de voorbewerkte beelden om **intensiteitsveranderingen** in horizontale en verticale richting te meten.  
+Hiermee worden **microprintlijnen en structuren** zichtbaar die typisch zijn voor echte biljetten.
 
-Metrieken:
-- Ratio van hoge-frequentie-energie tot totale energie (HF_ratio)
-- Aantal significante pieken in frequentiedomein (peak_count)
+#### Werking
+De gradiënten in X- en Y-richting worden gecombineerd via:
 
----
+\[
+M(x, y) = \sqrt{(G_x^2 + G_y^2)}
+\]
 
-### 5. Classificatie (Echt / Vals)
-Op basis van de gemeten kenmerken wordt een eenvoudige regelgebaseerde beslissing genomen:
-
+OpenCV-implementatie:
+```python
+sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+sobel_magnitude = cv2.magnitude(sobel_x, sobel_y)
+sobel_magnitude = cv2.normalize(sobel_magnitude, None, 0, 255, cv2.NORM_MINMAX)
 ```
+
+**Parameterkeuze:**
+- `ksize=3` – behoudt fijne details in bankbiljettexturen.  
+- `cv2.CV_64F` – voorkomt verlies van negatieve gradiënten.  
+- Vooraf lichte Gaussian blur (σ=0.5) om ruis te beperken.  
+
+**Resultaten:**
+- Echte biljetten: dichte, scherpe randstructuren.  
+- Valse biljetten: zachtere, diffuse randen.  
+
+De output wordt opgeslagen in `Output/Sobeledge/real/` en `Output/Sobeledge/fake/`.
+
+---
+
+### 3.2 Canny Edge Detection
+
+#### Doel
+De **Canny Edge Detector** is een meerstapsmethode die geschikt is voor **precieze randdetectie met lage ruisgevoeligheid**.  
+Ze combineert smoothing, gradiëntanalyse, non-maximum suppressie en hysterese-drempeling.
+
+#### Werking
+1. **Voorbewerking:** CLAHE + bilateraal filter (behoudt randen, verwijdert ruis).  
+2. **Adaptieve drempels:** op basis van de mediaan van pixelintensiteiten:  
+   \[
+   lower = 0.66 × median, \quad upper = 1.33 × median
+   \]
+3. **Randextractie:**
+   ```python
+   edges = cv2.Canny(smooth, lower, upper, apertureSize=3, L2gradient=True)
+   ```
+4. **Nabewerking:** morfologische sluiting en dilatie om randen te versterken.
+
+**Resultaten:**
+- Echte biljetten: rijke, consistente microstructuren.  
+- Valse biljetten: minder detail, lagere randdichtheid.  
+
+De resultaten worden opgeslagen in `Output/Cannyedge/`.
+
+---
+
+### 3.3 Vergelijking Sobel vs Canny
+
+| Kenmerk | Sobel Edge | Canny Edge |
+|----------|-------------|------------|
+| Complexiteit | Eenvoudig, lineair filter | Gecombineerde meerstapsanalyse |
+| Ruisgevoeligheid | Matig | Laag (inclusief smoothing & hysterese) |
+| Randnauwkeurigheid | Goed bij sterke randen | Uitstekend, ook bij subtiele structuren |
+| Geschiktheid voor biljetanalyse | Snel, minder detail | Precisie, textuurbehoud, stabiel resultaat |
+
+**Conclusie:**  
+Voor het *Banknote Verifier*-project is **Canny Edge Detection** gekozen als hoofdalgoritme vanwege de hoge precisie en ruisbestendigheid.  
+**Sobel Edge** blijft echter waardevol als referentiemethode en voor snelle testen.
+
+---
+
+## 4. Frequentiedomeinanalyse (FFT)
+Een **2D Fast Fourier Transform (FFT)** wordt toegepast op de grijswaardenversie van het biljet.  
+Door de energieverdeling in het frequentiedomein te analyseren kunnen drukpatronen herkend worden:
+
+- **Echte biljetten:** duidelijke ringstructuren of pieken in hoge frequenties.  
+- **Valse biljetten:** energie geconcentreerd in lage frequenties (vlak beeld).  
+
+**Metrieken:**
+- **HF_ratio:** verhouding hoge-frequentie-energie tot totale energie.  
+- **peak_count:** aantal significante pieken in het spectrum.
+
+---
+
+## 5. Classificatie (Echt / Vals)
+Een eenvoudige **regelgebaseerde beslissingsfunctie** bepaalt de classificatie:
+
+```python
 if (edge_density > threshold1) and (HF_ratio > threshold2):
     label = "Echt"
 else:
     label = "Vals"
 ```
 
-Drempelwaarden worden experimenteel bepaald door een reeks echte en valse biljetten te analyseren.
+De drempelwaarden worden experimenteel vastgesteld aan de hand van echte en valse biljetten.
 
 ---
 
-## Verwachte resultaten & evaluatie
-We zullen tijdens het project meetbare waarden verzamelen om de prestaties te beoordelen:
+## 6. Evaluatie & Verwachte resultaten
 
 | Metriek | Beschrijving | Doelwaarde |
 |----------|---------------|------------|
 | Edge density verschil | Gemiddeld verschil tussen echte en valse biljetten | > 20% |
-| HF-ratio verschil | Verschil in hoge-frequentie energie | > 15% |
+| HF-ratio verschil | Verschil in hoge-frequentie-energie | > 15% |
 | Classificatienauwkeurigheid | Correcte voorspellingen op testset | ≥ 80% |
 
-We zullen ook voorbeelden tonen van foutieve classificaties om beperkingen te bespreken.
+Daarnaast worden foutieve classificaties en randvoorbeelden geanalyseerd om de beperkingen van het systeem te bespreken.
 
 ---
 
-## Overwogen alternatieven
+## 7. Overwogen alternatieven
+
 | Stap | Alternatief | Waarom (nog) niet gekozen |
 |------|--------------|----------------------------|
-| Edge detection | Laplacian of Scharr filter | Geprobeerd indien Canny te gevoelig is voor ruis. |
-| Frequentieanalyse | Wavelet-transformatie | Interessant alternatief; mogelijk in latere fase. |
-| Classificatie | SVM of Random Forest | Te complex voor eerste prototype, maar kan later toegevoegd worden. |
-| Belichtingscorrectie | Retinex / homomorphic filtering | Wordt onderzocht als geavanceerde verbetering. |
+| Edge detection | Laplacian of Scharr filter | Eventueel alternatief bij overgevoeligheid van Canny. |
+| Frequentieanalyse | Wavelet-transformatie | Interessant, mogelijk in latere fase. |
+| Classificatie | SVM of Random Forest | Te complex voor eerste prototype. |
+| Belichtingscorrectie | Retinex / homomorphic filtering | Wordt onderzocht als geavanceerde uitbreiding. |
 
 ---
 
 ## Tools & afhankelijkheden
-- Python 3.12+
-- OpenCV – beeldbewerking en filtering
-- NumPy / SciPy – wiskundige berekeningen en FFT
-- Matplotlib – visualisatie van resultaten
-- (Optioneel): Raspberry Pi + camera-module
+- Python 3.12+  
+- OpenCV – beeldbewerking en filtering  
+- NumPy / SciPy – wiskundige berekeningen en FFT  
+- Matplotlib – visualisatie  
+- (Optioneel) Raspberry Pi + camera-module  
 
 ---
 
-## Installatie & gebruik (wordt verder aangevuld)
-```
+## Installatie & gebruik
+```bash
 # 1. Clone de repository
 git clone https://github.com/<jullie-gebruikersnaam>/banknote-verifier.git
 
@@ -125,23 +201,21 @@ python main.py
 ---
 
 ## Toekomstige uitbreidingen
-- Automatische herkenning van biljetwaarde (€5, €10, €20, …)
-- Real-time detectie via live camerastream
-- Analyse onder verschillende lichtcondities
-- Implementatie van een eenvoudige machine learning-classifier (indien toegestaan)
+- Automatische herkenning van biljetwaarde (€5, €10, €20, …)  
+- Real-time detectie via live camera  
+- Analyse onder verschillende lichtcondities  
+- Integratie van een eenvoudige machine learning-classifier  
+- Edge-density en HOG-analyse als aanvullende metrieken  
 
 ---
 
 ## Bronnen
-- Slides Image Processing – Dr. Ing. Koen Gilissen
-- OpenCV Documentation
-- Gonzalez & Woods, Digital Image Processing, 4th Edition
+- Slides Image Processing – Dr. Ing. Koen Gilissen  
+- OpenCV Documentation  
+- Gonzalez & Woods, *Digital Image Processing*, 4th Edition  
 
 ---
 
-Opmerking: Deze README is een levend document.
-Tijdens de ontwikkeling worden resultaten, grafieken, codevoorbeelden en prestatiemaatstaven toegevoegd.
-
-## Contributators
+## Contributoren
 - **Emiel Mangelschots** – _Student_ – [GitHub](https://github.com/empel06)  
-- **Bjarni Heselmans** – _Student_ – [GitHub](https://github.com/BjarniHeselmans) 
+- **Bjarni Heselmans** – _Student_ – [GitHub](https://github.com/BjarniHeselmans)
