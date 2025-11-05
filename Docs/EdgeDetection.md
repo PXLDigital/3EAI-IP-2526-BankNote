@@ -1,3 +1,11 @@
+# Edge Detection – Vergelijking tussen Sobel en Canny
+
+## Overzicht
+Deze module onderzoekt twee klassieke randdetectiemethoden — **Sobel Edge** en **Canny Edge** — toegepast op de bankbiljetbeelden van het project *Banknote Verifier*.  
+Beide algoritmen worden gebruikt om **micropatronen en randen** in echte en valse biljetten zichtbaar te maken, met als doel om op basis van randdichtheid en -structuur vervalsingen te onderscheiden.
+
+---
+
 # Sobel Edge – Randdetectie op bankbiljetten
 
 ## Doel
@@ -84,7 +92,7 @@ sobel_magnitude = cv2.normalize(sobel_magnitude, None, 0, 255, cv2.NORM_MINMAX)
 
 ## Uitvoeren van de pipeline
 
-### 1️⃣ Preprocessing + Sobel edge detectie uitvoeren
+### 1. Preprocessing + Sobel edge detectie uitvoeren
 Open een terminal in de map  
 `3EAI-IP-2526-BankNote\Software\Testing\SobelEdge\`  
 en voer uit:
@@ -93,7 +101,7 @@ en voer uit:
 python Testing.py
 ```
 
-### 2️⃣ Resultaten bekijken
+### 2. Resultaten bekijken
 Na voltooiing verschijnen de resultaten in:
 ```
 Output/
@@ -131,9 +139,73 @@ cv2.waitKey(0)
 
 ---
 
+# Canny Edge – Verbeterde randdetectie met adaptieve drempels
+
+## Doel
+De **Canny edge detection**-methode is een geavanceerde randdetector die meerdere stappen combineert: ruisonderdrukking, gradiëntanalyse, non-maximum suppressie en hysterese-drempeling.  
+Deze methode is ideaal voor **bankbiljetanalyse**, omdat ze fijne details behoudt en storende ruis beperkt.
+
+---
+
+## Bestandsoverzicht
+
+| Bestand | Omschrijving |
+|----------|---------------|
+| `EdgeDensityAnalysis.py` | Analyseert randdichtheid op Canny-edgebeelden. |
+| `CannyEnhanced.py` | Voert verbeterde Canny edge-detectie uit met contrastversterking en adaptieve drempels. |
+| `Output/Cannyedge/` | Bevat de resultaten van de Canny edge-detectie per biljet. |
+
+---
+
+## Werking van de Canny Edge Detection
+
+### 1. Voorbewerking
+De afbeelding wordt eerst **omgezet naar grijswaarden** en doorloopt daarna een verbeterde voorbewerking:
+- **CLAHE (Contrast Limited Adaptive Histogram Equalization):** verhoogt lokaal contrast zodat fijne details beter zichtbaar worden.
+- **Bilateraal filter:** verwijdert ruis zonder randen te vervagen.
+
+### 2. Automatische drempelbepaling
+In plaats van vaste waarden gebruikt de implementatie de **mediaan van pixelintensiteiten** om adaptieve onder- en bovengrenzen te berekenen:
+\[
+lower = 0.66 × median, \quad upper = 1.33 × median
+\]
+
+### 3. Randdetectie
+De eigenlijke Canny-filter wordt toegepast met:
+```python
+edges = cv2.Canny(smooth, lower, upper, apertureSize=3, L2gradient=True)
+```
+
+### 4. Morfologische nabewerking
+Met een kleine kernel worden de randen **gesloten en versterkt**:
+```python
+edges = cv2.dilate(edges, np.ones((2,2), np.uint8), iterations=1)
+edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((2,2), np.uint8))
+```
+
+---
+
+## Vergelijking tussen Sobel en Canny
+
+| Kenmerk | Sobel Edge | Canny Edge |
+|----------|-------------|------------|
+| Complexiteit | Eenvoudig, lineair filter | Gecombineerde meerstapsanalyse |
+| Ruisgevoeligheid | Matig (geen filtering) | Laag (inclusief smoothing & hysterese) |
+| Randnauwkeurigheid | Goed voor sterke randen | Uitstekend, ook voor subtiele texturen |
+| Geschiktheid voor biljetten | Snel, minder detail | Precisie, detail, en ruisonderdrukking |
+
+---
+
+## Conclusie – Gekozen methode
+
+Voor het *Banknote Verifier*-project kiezen we **Canny Edge Detection** als hoofdalgoritme.  
+De **Sobel Edge** blijft nuttig als referentiemethode of voor snellere testen.
+
+---
+
 **Auteur(s):**  
-- Emiel Mangelschots  
-- Bjarni Heselmans  
+- Emiel Mangelschots – Canny Edge  
+- Bjarni Heselmans – Sobel Edge  
 
 **Project:** *Banknote Verifier – Echt vs Vals Geld Herkenning*  
 **Versie:** v1.0  
