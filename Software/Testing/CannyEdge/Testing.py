@@ -1,33 +1,46 @@
+# main.py
 import os
 import cv2
-from scripts.Preprocessing import preprocess_image, save_image
+from Preprocessing import preprocess_image
+from CannyEdge import apply_canny_edge_detection
 
-# Input en output directories
-input_dirs = ['images/real/', 'images/fake/']
-output_base_dir = 'output/preprocessed/'
+# Padconfiguratie
+BASE_INPUT_DIR = r"C:\Users\12302093\OneDrive - PXL\SH_25_26\ImageProcessing\3EAI-IP-2526-BankNote\Software\Testing\CannyEdge\Images\Input"
+BASE_OUTPUT_DIR = r"C:\Users\12302093\OneDrive - PXL\SH_25_26\ImageProcessing\3EAI-IP-2526-BankNote\Software\Testing\CannyEdge\Images\Output"
 
-# Doorloop elke datasetmap (real / fake)
-for input_dir in input_dirs:
-    label = os.path.basename(os.path.normpath(input_dir))  # 'real' of 'fake'
-    output_dir = os.path.join(output_base_dir, label)
+# Submappen (real / fake)
+subfolders = ["real", "fake"]
+
+# Verwerk elke categorie
+for subfolder in subfolders:
+    input_dir = os.path.join(BASE_INPUT_DIR, subfolder)
+    output_dir = os.path.join(BASE_OUTPUT_DIR, subfolder)
     os.makedirs(output_dir, exist_ok=True)
-    
-    for filename in os.listdir(input_dir):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            input_path = os.path.join(input_dir, filename)
-            image = cv2.imread(input_path)
-            
-            if image is None:
-                print(f"[FOUT] Kan beeld niet laden: {input_path}")
-                continue
-            
-            # Pre-process het beeld
-            processed_image = preprocess_image(image)
-            
-            # Sla het resultaat op
-            output_filename = filename.replace('.png', '_processed.png').replace('.jpg', '_processed.jpg')
-            save_image(processed_image, output_dir, output_filename)
-            
-            print(f"[OK] {input_path} → {os.path.join(output_dir, output_filename)}")
 
-print("Pre-processing voltooid.")
+    print(f"\n=== Verwerken van map: {subfolder.upper()} ===")
+
+    for filename in os.listdir(input_dir):
+        if not filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            continue
+
+        input_path = os.path.join(input_dir, filename)
+        image = cv2.imread(input_path)
+
+        if image is None:
+            print(f"[FOUT] Kan beeld niet laden: {input_path}")
+            continue
+
+        # --- Stap 1: Pre-processing ---
+        preprocessed = preprocess_image(image)
+
+        # --- Stap 2: Canny edge detection ---
+        edges = apply_canny_edge_detection(preprocessed)
+
+        # --- Stap 3: Opslaan van enkel Canny-output ---
+        output_filename = os.path.splitext(filename)[0] + "_edges.png"
+        output_path = os.path.join(output_dir, output_filename)
+        cv2.imwrite(output_path, edges)
+
+        print(f"[OK] {filename} → {output_path}")
+
+print("\nCanny edge detection pipeline voltooid.")
