@@ -61,6 +61,7 @@ for input_dir in input_dirs:
 
         # 2. Detecteer randen (Canny) op de Gabor-versterkte structuur
         canny_image = apply_canny_edge_detection(laplacian_image)
+        
         # 3. Haal oriëntatie- en frequentiespecifieke patronen met Gabor
         combined_edges = apply_gabor_filters(canny_image)
 

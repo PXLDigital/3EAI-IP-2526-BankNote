@@ -105,8 +105,11 @@ def apply_laplacian_filter(image, kernel_size=3, scale=1, delta=0, debug=False):
     Returns:
         laplacian_enhanced (np.ndarray): Versterkt grijsbeeld.
     """
-    # --- 1. Converteer naar grijs ---
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # --- 1. Controleer of het beeld kleur of grijs is ---
+    if len(image.shape) == 3 and image.shape[2] == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image.copy()  # beeld is al grijs
 
     # --- 2. Bereken Laplacian ---
     lap = cv2.Laplacian(gray, cv2.CV_64F, ksize=kernel_size, scale=scale, delta=delta)
