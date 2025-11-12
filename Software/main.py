@@ -5,6 +5,7 @@ from scripts.Edges import (
     apply_canny_edge_detection,
     apply_laplacian_filter,
     compute_edge_density,
+    apply_gabor_filters,
 )
 import csv
 
@@ -55,11 +56,13 @@ for input_dir in input_dirs:
         save_image(preprocessed, preprocessed_output_dir, preprocessed_filename)
 
         # --- Stap 2: Laplacian + Canny gecombineerd ---
-        # Eerst details versterken met Laplacian
+        # 1. Versterk texturen via Laplacian
         laplacian_image = apply_laplacian_filter(preprocessed)
 
-        # Daarna randen detecteren op het versterkte beeld
-        combined_edges = apply_canny_edge_detection(laplacian_image)
+        # 2. Detecteer randen (Canny) op de Gabor-versterkte structuur
+        canny_image = apply_canny_edge_detection(laplacian_image)
+        # 3. Haal oriëntatie- en frequentiespecifieke patronen met Gabor
+        combined_edges = apply_gabor_filters(canny_image)
 
         # Sla het gecombineerde resultaat op
         combined_filename = os.path.splitext(filename)[0] + "_edges_combined.png"

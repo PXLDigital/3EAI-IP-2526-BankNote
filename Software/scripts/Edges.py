@@ -122,3 +122,48 @@ def apply_laplacian_filter(image, kernel_size=3, scale=1, delta=0, debug=False):
         cv2.destroyAllWindows()
 
     return laplacian_enhanced
+
+def apply_gabor_filters(image, frequencies=[0.1, 0.2, 0.3], orientations=8, debug=False):
+    """
+    Toepassing van Gabor-filters om oriëntatie- en frequentiespecifieke texturen te detecteren.
+    Parameters:
+        image (np.ndarray): Inputbeeld (BGR of grijs)
+        frequencies (list): Ruimtelijke frequenties (1 / golflengte)
+        orientations (int): Aantal richtingen (bijv. 8 = 0°, 22.5°, ... 157.5°)
+    Returns:
+        texture_energy (np.ndarray): Gecombineerde textuursterktekaart
+    """
+    # --- 1. Converteer naar grijs ---
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image
+
+    rows, cols = gray.shape
+    accum = np.zeros_like(gray, dtype=np.float32)
+
+    # --- 2. Loop over oriëntaties en frequenties ---
+    for theta in np.linspace(0, np.pi, orientations, endpoint=False):
+        for freq in frequencies:
+            kernel = cv2.getGaborKernel(
+                ksize=(21, 21),  # grootte van filtervenster
+                sigma=4.0,       # breedte van de Gaussiaan
+                theta=theta,     # oriëntatie
+                lambd=1/freq,    # golflengte
+                gamma=0.5,       # anisotropie: 0.5 = elliptisch
+                psi=0,           # faseverschuiving
+                ktype=cv2.CV_32F
+            )
+            filtered = cv2.filter2D(gray, cv2.CV_32F, kernel)
+            accum = np.maximum(accum, filtered)  # neem maximumrespons
+
+    # --- 3. Normaliseer ---
+    texture_energy = cv2.normalize(accum, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+    if debug:
+        cv2.imshow("Gabor Texture Map", texture_energy)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    return texture_energy
+
