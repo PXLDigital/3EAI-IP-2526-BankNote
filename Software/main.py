@@ -8,7 +8,7 @@ from scripts.Edges import (
     compute_edge_density,
     apply_gabor_filters,
 )
-from scripts.FFT_analysis import apply_fft
+from scripts.FFT_analysis import apply_fft, compute_hf_ratio, compute_peak_count
 
 # --- Base project directory ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Software/
@@ -26,6 +26,7 @@ edges_base_dir = os.path.join(PROJECT_ROOT, "Output", "Edges")
 fft_base_dir = os.path.join(PROJECT_ROOT, "Output", "FFT")
 
 edge_density_output_file = os.path.join(edges_base_dir, "edge_density.csv")
+fft_features_file = os.path.join(fft_base_dir, "fft_features.csv")
 
 # Zorg dat hoofdoutputmappen bestaan
 os.makedirs(edges_base_dir, exist_ok=True)
@@ -33,6 +34,7 @@ os.makedirs(fft_base_dir, exist_ok=True)
 
 # Verzamel edge densities
 all_edge_densities = {}
+all_fft_features = {}
 
 # --- Loop over elke datasetmap (real / fake) ---
 for input_dir in input_dirs:
@@ -77,13 +79,16 @@ for input_dir in input_dirs:
         print(f"[OK] {filename} → "
               f"Edges: {combined_filename}, Edge density: {density:.4f}")
 
-        # --- Stap 4: FFT-analyse (nieuw) ---
+        # --- Stap 4: FFT-analyse ---
         fft_filename = os.path.splitext(filename)[0] + "_FFT_spectrum.png"
         fft_save_path = os.path.join(fft_output_dir, fft_filename)
 
         try:
-            apply_fft(input_path, save_path=fft_save_path, visualize=False)
-            print(f"[FFT] {filename} → Spectrum opgeslagen in {fft_save_path}")
+            spectrum = apply_fft(input_path, save_path=fft_save_path, visualize=False)
+            hf_ratio = compute_hf_ratio(spectrum)
+            peak_count = compute_peak_count(spectrum)
+            all_fft_features[f"{label}/{filename}"] = (hf_ratio, peak_count)
+            print(f"[FFT] {filename} → Spectrum opgeslagen, HF_ratio: {hf_ratio:.4f}, Peak count: {peak_count}")
         except Exception as e:
             print(f"[FOUT bij FFT] {filename}: {e}")
 
@@ -94,6 +99,14 @@ with open(edge_density_output_file, mode='w', newline='') as csvfile:
     for filename, density in all_edge_densities.items():
         writer.writerow([filename, density])
 
+# --- Stap 6: FFT-features naar CSV ---
+with open(fft_features_file, mode='w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(["Filename", "HF_ratio", "PeakCount"])
+    for filename, (hf_ratio, peak_count) in all_fft_features.items():
+        writer.writerow([filename, hf_ratio, peak_count])
+
 print(f"\nPipeline voltooid!")
 print(f"- Gecombineerde edge densities opgeslagen in: {edge_density_output_file}")
 print(f"- FFT-spectra opgeslagen in: {fft_base_dir}")
+print(f"- FFT-features (HF_ratio + PeakCount) opgeslagen in: {fft_features_file}")
