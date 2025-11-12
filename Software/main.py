@@ -1,5 +1,6 @@
 import os
 import cv2
+import csv
 from scripts.Preprocessing import preprocess_image, save_image
 from scripts.Edges import (
     apply_canny_edge_detection,
@@ -7,7 +8,7 @@ from scripts.Edges import (
     compute_edge_density,
     apply_gabor_filters,
 )
-import csv
+from scripts.FFT_analysis import apply_fft
 
 # --- Base project directory ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Software/
@@ -22,10 +23,13 @@ input_dirs = [
 # --- Output directories ---
 preprocessed_base_dir = os.path.join(PROJECT_ROOT, "Output", "Preprocessed")
 edges_base_dir = os.path.join(PROJECT_ROOT, "Output", "Edges")
+fft_base_dir = os.path.join(PROJECT_ROOT, "Output", "FFT")
+
 edge_density_output_file = os.path.join(edges_base_dir, "edge_density.csv")
 
-# Zorg dat de hoofdmap voor edges bestaat
+# Zorg dat hoofdoutputmappen bestaan
 os.makedirs(edges_base_dir, exist_ok=True)
+os.makedirs(fft_base_dir, exist_ok=True)
 
 # Verzamel edge densities
 all_edge_densities = {}
@@ -35,8 +39,11 @@ for input_dir in input_dirs:
     label = os.path.basename(os.path.normpath(input_dir))  # 'real' of 'fake'
     preprocessed_output_dir = os.path.join(preprocessed_base_dir, label)
     edges_output_dir = os.path.join(edges_base_dir, label)
+    fft_output_dir = os.path.join(fft_base_dir, label)
+
     os.makedirs(preprocessed_output_dir, exist_ok=True)
     os.makedirs(edges_output_dir, exist_ok=True)
+    os.makedirs(fft_output_dir, exist_ok=True)
 
     print(f"\n=== Verwerken van map: {label.upper()} ===")
 
@@ -56,16 +63,10 @@ for input_dir in input_dirs:
         save_image(preprocessed, preprocessed_output_dir, preprocessed_filename)
 
         # --- Stap 2: Laplacian + Canny gecombineerd ---
-        # 1. Versterk texturen via Laplacian
         laplacian_image = apply_laplacian_filter(preprocessed)
-
-        # 2. Detecteer randen (Canny) op de Gabor-versterkte structuur
         canny_image = apply_canny_edge_detection(laplacian_image)
-        
-        # 3. Haal oriëntatie- en frequentiespecifieke patronen met Gabor
         combined_edges = apply_gabor_filters(canny_image)
 
-        # Sla het gecombineerde resultaat op
         combined_filename = os.path.splitext(filename)[0] + "_edges_combined.png"
         save_image(combined_edges, edges_output_dir, combined_filename)
 
@@ -74,15 +75,25 @@ for input_dir in input_dirs:
         all_edge_densities[f"{label}/{filename}"] = density
 
         print(f"[OK] {filename} → "
-              f"Preprocessed: {preprocessed_filename}, "
-              f"Edges (Laplacian + Canny): {combined_filename}, "
-              f"Edge density: {density:.4f}")
+              f"Edges: {combined_filename}, Edge density: {density:.4f}")
 
-# --- Stap 4: Edge densities naar CSV ---
+        # --- Stap 4: FFT-analyse (nieuw) ---
+        fft_filename = os.path.splitext(filename)[0] + "_FFT_spectrum.png"
+        fft_save_path = os.path.join(fft_output_dir, fft_filename)
+
+        try:
+            apply_fft(input_path, save_path=fft_save_path, visualize=False)
+            print(f"[FFT] {filename} → Spectrum opgeslagen in {fft_save_path}")
+        except Exception as e:
+            print(f"[FOUT bij FFT] {filename}: {e}")
+
+# --- Stap 5: Edge densities naar CSV ---
 with open(edge_density_output_file, mode='w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow(["Filename", "EdgeDensity"])
     for filename, density in all_edge_densities.items():
         writer.writerow([filename, density])
 
-print(f"\nPipeline voltooid! Gecombineerde edge densities opgeslagen in {edge_density_output_file}")
+print(f"\nPipeline voltooid!")
+print(f"- Gecombineerde edge densities opgeslagen in: {edge_density_output_file}")
+print(f"- FFT-spectra opgeslagen in: {fft_base_dir}")
