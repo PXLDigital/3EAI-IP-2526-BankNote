@@ -31,8 +31,11 @@ def apply_canny_edge_detection(
         edges (np.ndarray): Binair beeld (wit = rand, zwart = geen rand).
     """
 
-    # --- 1. Converteer naar grijswaarden ---
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # --- 1. Controleer of het beeld kleur of grijs is ---
+    if len(image.shape) == 3 and image.shape[2] == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image.copy()  # beeld is al grijs
 
     # --- 2. Filtering: ruisonderdrukking met behoud van textuur ---
     if use_bilateral:
@@ -85,3 +88,37 @@ def compute_edge_density(edges):
     total_pixels = edges.size
     edge_pixels = np.count_nonzero(edges)
     return edge_pixels / total_pixels
+
+
+def apply_laplacian_filter(image, kernel_size=3, scale=1, delta=0, debug=False):
+    """
+    Toepassing van Laplacian-filter om hoge frequenties te versterken.
+    Accentueert fijne texturen en microstructuren in bankbiljetten.
+
+    Parameters:
+        image (np.ndarray): Inputbeeld (BGR of grijs).
+        kernel_size (int): Kernelgrootte (meestal 1, 3 of 5).
+        scale (float): Schaalfactor voor versterking.
+        delta (float): Offset toegevoegd aan resultaat.
+        debug (bool): Toon resultaten visueel (optioneel).
+
+    Returns:
+        laplacian_enhanced (np.ndarray): Versterkt grijsbeeld.
+    """
+    # --- 1. Converteer naar grijs ---
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # --- 2. Bereken Laplacian ---
+    lap = cv2.Laplacian(gray, cv2.CV_64F, ksize=kernel_size, scale=scale, delta=delta)
+    lap_abs = cv2.convertScaleAbs(lap)
+
+    # --- 3. Combineer met origineel (accentuatie) ---
+    laplacian_enhanced = cv2.addWeighted(gray, 0.7, lap_abs, 0.7, 0)
+
+    # --- 4. Optioneel: debug tonen ---
+    if debug:
+        cv2.imshow("Laplacian Enhanced", laplacian_enhanced)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    return laplacian_enhanced
