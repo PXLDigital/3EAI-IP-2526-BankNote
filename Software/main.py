@@ -1,6 +1,7 @@
 import os
 import cv2
 import csv
+import numpy as np
 from scripts.Preprocessing import preprocess_image, save_image
 from scripts.Edges import (
     apply_canny_edge_detection,
@@ -9,6 +10,7 @@ from scripts.Edges import (
     apply_gabor_filters,
 )
 from scripts.FFT_analysis import apply_fft, compute_hf_ratio, compute_peak_count
+from scripts.Classification import extract_features_from_folder
 
 # --- Base project directory ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Software/
@@ -105,6 +107,20 @@ with open(fft_features_file, mode='w', newline='') as csvfile:
     writer.writerow(["Filename", "HF_ratio", "PeakCount"])
     for filename, (hf_ratio, peak_count) in all_fft_features.items():
         writer.writerow([filename, hf_ratio, peak_count])
+
+# --- Stap 7: automatische feature-vector per afbeelding---
+real_dir = os.path.join(PROJECT_ROOT, "Images", "real")
+fake_dir = os.path.join(PROJECT_ROOT, "Images", "fake")
+
+X_real, y_real = extract_features_from_folder(real_dir, label=0)
+X_fake, y_fake = extract_features_from_folder(fake_dir, label=1)
+
+X = np.vstack([X_real, X_fake])
+y = np.concatenate([y_real, y_fake])
+
+
+print("Feature matrix shape:", X.shape)
+print("Labels shape:", y.shape)
 
 print(f"\nPipeline voltooid!")
 print(f"- Gecombineerde edge densities opgeslagen in: {edge_density_output_file}")
