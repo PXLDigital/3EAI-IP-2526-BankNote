@@ -1,0 +1,12 @@
+Filename,True_Label,Prediction,Correct,Confidence,Edge_Density,HF_Ratio
+real/10euroReal.png,real,Echt,1,1.0000,0.4453,0.000277
+real/200euroReal.png,real,Nep,0,0.3080,0.8819,0.003324
+real/20euroReal.png,real,Echt,1,1.0000,0.5968,0.000141
+real/50euroReal.png,real,Echt,1,1.0000,0.5205,0.000266
+real/5euroReal.png,real,Echt,1,0.9657,0.4180,0.000703
+fake/100euroFake.png,fake,Nep,1,0.9323,0.7410,0.005197
+fake/10euroFake.png,fake,Nep,1,1.0000,0.8721,0.006969
+fake/200euroFake.png,fake,Nep,1,0.3243,0.7456,0.002627
+fake/20euroFake.png,fake,Nep,1,1.0000,0.8962,0.006065
+fake/50euroFake.png,fake,Nep,1,1.0000,0.8768,0.006765
+fake/5euroFake.png,fake,Nep,1,0.2275,0.6324,0.003682
