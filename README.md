@@ -1,5 +1,5 @@
 # Banknote Verifier – Echt vs Vals Geld Herkenning 
-**Laatste update:** 2025-11-05  
+**Laatste update:** 2025-12-03  
 
 ## Groepsleden
 - Emiel Mangelschots  
@@ -24,6 +24,25 @@ Door deze kenmerken te analyseren en te kwantificeren kunnen we het biljet class
 
 ## Overzicht van de methode
 
+Globale pipeline:
+
+1. Beeldverwerving (webcam / camera / dataset)
+2. Voorbewerking (Preprocessing)
+3. Edge-analyse (Canny, Laplacian + Canny, Gabor)
+4. FFT-analyse (HF_ratio, PeakCount)
+5. Feature-extractie en opslag naar CSV
+6. **Regelgebaseerde classificatie** (Echt / Nep)
+7. Visualisatie van features en prestaties (plots)
+
+De implementatie gebeurt vooral in:
+- `Software/main.py`
+- `Software/scripts/Preprocessing.py`
+- `Software/scripts/Edges.py`
+- `Software/scripts/FFT_analysis.py`
+- `Software/scripts/Classification.py`
+
+---
+
 ### 1. Beeldverwerving
 - Input via webcam of microcontroller (bijv. Raspberry Pi).
 - Biljetten worden op een egale achtergrond geplaatst onder constante belichting.
@@ -41,6 +60,8 @@ Doel: stabiliseren van belichting, verbeteren van contrast en ruisonderdrukking.
 | Ruisonderdrukking | Gaussian blur (σ = 0.5–2) | Vermindert hoge-frequentieruis en stabiliseert randdetectie. |
 
 De voorbewerkte beelden worden opgeslagen in Output/real/ en Output/fake/.
+
+![Preprocessing echt biljet](./Output/Preprocessed/real/20euroReal_preprocessed.png)
 
 ---
 
@@ -226,7 +247,127 @@ De drempelwaarden worden experimenteel vastgesteld aan de hand van echte en vals
 
 ---
 
-## 6. Evaluatie & Verwachte resultaten
+## 6. Regelgebaseerde Classificatie (Echt / Nep)
+
+Dit is de kern van de eerste classifier: op basis van gemeten features (`HF_ratio` en `edge_density`) een beslissing maken of een biljet waarschijnlijk echt of vals is.
+
+Bestand: [Classification.py](./Software/scripts/Classification.py) → `classify_rule_based`  
+Aangeroepen vanuit: [main.py](./Software/main.py)
+
+### 6.1 Beslislogica
+
+Uit de gemeten data blijkt:
+
+- Echte biljetten hebben over het algemeen een **lage HF_ratio**.
+- Valse biljetten hebben een **hogere HF_ratio**.
+- Daarnaast hebben valse biljetten vaak een **hogere edge_density** dan echte.
+
+Daarom gebruiken we een eenvoudige, maar effectieve beslisregel met twee stappen:
+
+1) Hoofdregel op basis van HF_ratio  
+- Als `HF_ratio ≤ 0.003` → biljet wordt geclassificeerd als **“Echt”**  
+- Als `HF_ratio > 0.003` → biljet wordt geclassificeerd als **“Nep”**
+
+2) Correctie in de twijfelzone met edge_density  
+- Twijfelzone: `|HF_ratio − 0.003| < 0.001`  
+- Als in die zone ook `edge_density > 0.70` is, dan wordt het biljet als **“Nep”** geclassificeerd (override), omdat de structuur dan sterk lijkt op de valse voorbeelden.
+
+In pseudocode:
+```
+def classify_rule_based(edge_density, hf_ratio,t_hf=0.003,t_ed_high=0.70)
+# Stap 1: hoofdregel op HF_ratio
+if hf_ratio <= t_hf:
+    prediction = "Echt"
+else:
+    prediction = "Nep"
+
+# Stap 2: twijfelzone corrigeren met edge_density
+if abs(hf_ratio - t_hf) < 0.001:
+    if edge_density > t_ed_high:
+        prediction = "Nep"
+
+# Stap 3: eenvoudige confidence-score
+base_conf = min(abs(hf_ratio - t_hf) / 0.003, 1.0)
+# (in de code wordt hier nog een kleine bonus toegepast 
+# als edge_density “consistent” is met de voorspelling)
+confidence = base_conf  # vereenvoudigd
+
+return prediction, confidence
+```
+
+De thresholds worden in `main.py` gedefinieerd als:
+```
+THRESHOLD_HF_RATIO = 0.003
+THRESHOLD_EDGE_DENSITY_HIGH = 0.70
+```
+
+En zo aangeroepen:
+```
+prediction, confidence = classify_rule_based(
+density,
+hf_ratio,
+t_hf=THRESHOLD_HF_RATIO,
+t_ed_high=THRESHOLD_EDGE_DENSITY_HIGH
+)
+```
+
+### 6.2 Intuïtieve uitleg
+
+- Eerst kijken we naar **HF_ratio**:
+  - laag → typisch echt
+  - hoog → typisch vals
+- Als de HF_ratio heel dicht bij de grens ligt, wordt **edge_density** gebruikt om extra context te geven:
+  - hoge edge_density in de twijfelzone → eerder vals
+
+Zo krijgen we een eenvoudige maar verklaarbare classifier die expliciet steunt op twee interpreteerbare features.
+
+---
+
+## 7. Visualisaties en eerste resultaten
+
+Om de methode en de resultaten inzichtelijk te maken, worden de gemeten waarden en prestaties gevisualiseerd met Matplotlib.  
+De plots worden automatisch gegenereerd in [plots](./Output/plots/) wanneer `main.py` wordt uitgevoerd.
+
+### 7.1 Scatterplot: EdgeDensity vs HF_ratio
+
+Bestand:  
+`Output/plots/scatter_edge_hf.png`
+
+In deze plot wordt voor elk biljet de relatie tussen edge_density en HF_ratio getoond:
+
+- x-as: `Edge_Density`
+- y-as: `HF_ratio`
+- kleur:
+  - groen = echte biljetten (`real`)
+  - rood = valse biljetten (`fake`)
+
+![Scatter edge](./Output/plots/scatter_edge_hf.png)
+
+Interpretatie:
+
+- Valse biljetten hebben gemiddeld een **hogere edge_density** dan echte biljetten.
+- Dit bevestigt dat edge_density nuttig is als extra signaal, vooral in twijfelgevallen rond de HF-ratio-drempel.
+
+---
+
+### 7.3 Accuracy-plot
+
+Bestand:  
+`Output/plots/accuracy.png`
+
+Deze plot toont de totale classificatie-accuracy als een eenvoudige balkgrafiek (0–1).
+
+Huidige resultaten op de gebruikte dataset:
+
+- Totale voorspellingen: 11
+- Correcte voorspellingen: 10
+- Accuracy: **90.91%**
+
+Deze waarde wordt ook in de terminal weergegeven na het draaien van `main.py`.
+
+---
+
+## 8. Evaluatie & Verwachte resultaten
 | Metriek | Beschrijving | Doelwaarde |
 |----------|---------------|------------|
 | Edge density verschil | Gemiddeld verschil tussen echte en valse biljetten | > 20% |
@@ -237,12 +378,11 @@ Daarnaast worden foutieve classificaties en randvoorbeelden geanalyseerd om de b
 
 ---
 
-## 7. Overwogen alternatieven
+## 9. Overwogen alternatieven
 | Stap | Alternatief | Waarom (nog) niet gekozen |
 |------|--------------|----------------------------|
 | Edge detection | Laplacian of Scharr filter | Eventueel alternatief bij overgevoeligheid van Canny. |
 | Frequentieanalyse | Wavelet-transformatie | Interessant, mogelijk in latere fase. |
-| Classificatie | SVM of Random Forest | Te complex voor eerste prototype. |
 | Belichtingscorrectie | Retinex / homomorphic filtering | Wordt onderzocht als geavanceerde uitbreiding. |
 
 ---
