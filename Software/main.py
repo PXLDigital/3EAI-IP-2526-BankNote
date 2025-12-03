@@ -2,6 +2,7 @@ import os
 import cv2
 import csv
 import numpy as np
+import matplotlib.pyplot as plt
 
 from scripts.Preprocessing import preprocess_image, save_image
 from scripts.Edges import (
@@ -205,3 +206,57 @@ if total_predictions > 0:
     print(f"Accuracy: {accuracy:.2%}")
 else:
     print("[WAARSCHUWING] Geen voorspellingen gemaakt")
+
+# --- Stap 10: Grafieken ---
+if total_predictions > 0:
+    filenames = []
+    true_labels = []
+    preds = []
+    edge_vals = []
+    hf_vals = []
+
+    for filename, result in all_classifications.items():
+        filenames.append(filename)
+        true_labels.append(result['true_label'])
+        preds.append(result['prediction'])
+        edge_vals.append(result['edge_density'])
+        hf_vals.append(result['hf_ratio'])
+
+    # 1) Scatterplot EdgeDensity vs HF_ratio (kleur op true label)
+    colors = ['green' if lbl == 'real' else 'red' for lbl in true_labels]
+
+    plt.figure(figsize=(6, 5))
+    plt.scatter(edge_vals, hf_vals, c=colors, alpha=0.7)
+    plt.xlabel("Edge Density")
+    plt.ylabel("HF_ratio")
+    plt.title("Edge Density vs HF_ratio (green=real, red=fake)")
+    scatter_path = os.path.join(PROJECT_ROOT, "Output", "plots", "scatter_edge_hf.png")
+    os.makedirs(os.path.dirname(scatter_path), exist_ok=True)
+    plt.savefig(scatter_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+    # 2) Histogram van edge density per klasse
+    real_edges = [e for e, lbl in zip(edge_vals, true_labels) if lbl == 'real']
+    fake_edges = [e for e, lbl in zip(edge_vals, true_labels) if lbl == 'fake']
+
+    plt.figure(figsize=(6, 5))
+    plt.hist(real_edges, bins=5, alpha=0.7, label="real", color="green")
+    plt.hist(fake_edges, bins=5, alpha=0.7, label="fake", color="red")
+    plt.xlabel("Edge Density")
+    plt.ylabel("Aantal")
+    plt.title("Verdeling Edge Density per klasse")
+    plt.legend()
+    hist_path = os.path.join(PROJECT_ROOT, "Output", "plots", "hist_edge_density.png")
+    plt.savefig(hist_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+    # 3) Simple accuracy bar plot
+    plt.figure(figsize=(4, 5))
+    plt.bar(["Accuracy"], [accuracy], color="blue")
+    plt.ylim(0, 1)
+    plt.title("Classificatie-accuracy")
+    acc_plot_path = os.path.join(PROJECT_ROOT, "Output", "plots", "accuracy.png")
+    plt.savefig(acc_plot_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+    print(f"Plots opgeslagen in: {os.path.join(PROJECT_ROOT, 'Output', 'plots')}")
